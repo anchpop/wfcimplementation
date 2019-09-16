@@ -23,6 +23,9 @@ public class WaveformcCollapse : MonoBehaviour
     public GameObject blackSquare;
     public GameObject whiteSquare;
     List<GameObject> squares;
+    public bool autorun = false;
+    
+
 
     // Start is called before the first frame update
     void Start()
@@ -96,6 +99,14 @@ public class WaveformcCollapse : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (autorun)
+        {
+            step();
+        }
+    }
+
+    public void step()
+    {
         // Find the position with the most negentropy
         var maxx = 0;
         var maxy = 0;
@@ -149,6 +160,7 @@ public class WaveformcCollapse : MonoBehaviour
         }
 
         // propagate updates
+        List<List<Dictionary<List<List<int>>, bool>>> waveCopy = new List<List<Dictionary<List<List<int>>, bool>>>(wave);
         var fdsaf = 0;
         while (true)
         {
@@ -158,45 +170,49 @@ public class WaveformcCollapse : MonoBehaviour
             {
                 foreach (int y in Enumerable.Range(0, wave[0].Count))
                 {
-                    foreach (var possibility in wave[x][y].Keys.ToArray())
+                    var truePossibilities = from entry in wave[x][y]
+                                           where entry.Value
+                                           select entry.Key;
+                    if (truePossibilities.Count() < 2)
                     {
-                        if (wave[x][y][possibility])
+                        continue;
+                    }
+                    foreach (var possibility in truePossibilities.ToArray())
+                    {
+                        foreach (int xr in Enumerable.Range(0, n))
                         {
-                            foreach (int xr in Enumerable.Range(0, n))
+                            foreach (int yr in Enumerable.Range(0, n))
                             {
-                                foreach (int yr in Enumerable.Range(0, n))
+                                var posx = x + xr;
+                                var posy = y + yr;
+                                var color = possibility[xr][yr];
+                                bool colorCanStay = true;
+                                foreach (int xi in Enumerable.Range(0, n))
                                 {
-                                    var posx = x + xr;
-                                    var posy = y + yr;
-                                    var color = possibility[xr][yr];
-                                    bool colorCanStay = true;
-                                    foreach (int xi in Enumerable.Range(0, n))
+                                    foreach (int yi in Enumerable.Range(0, n))
                                     {
-                                        foreach (int yi in Enumerable.Range(0, n))
+                                        if ((posx - xi) >= 0 && (posy - yi) >= 0 && (posx - xi) < wave.Count && (posy - yi) < wave[0].Count)
                                         {
-                                            if ((posx - xi) >= 0 && (posy - yi) >= 0 && (posx - xi) < possibility.Count && (posy - yi) < possibility[0].Count)
+                                            bool foundOne = false;
+                                            foreach (var possibility2 in wave[posx - xi][posy - yi])
                                             {
-                                                bool foundOne = false;
-                                                foreach (var possibility2 in wave[posx - xi][posy - yi])
+                                                if (possibility2.Value && possibility2.Key[xi][yi] == color)
                                                 {
-                                                    if (possibility2.Value && possibility2.Key[xi][yi] == color)
-                                                    {
-                                                        foundOne = true;
-                                                        break;
-                                                    }
+                                                    foundOne = true;
+                                                    break;
                                                 }
-                                                if (!foundOne)
-                                                {
-                                                    colorCanStay = false;
-                                                }
+                                            }
+                                            if (!foundOne)
+                                            {
+                                                colorCanStay = false;
                                             }
                                         }
                                     }
-                                    if (!colorCanStay)
-                                    {
-                                        wave[x][y][possibility] = false;
-                                        madeAChange = true;
-                                    }
+                                }
+                                if (!colorCanStay)
+                                {
+                                    wave[x][y][possibility] = false;
+                                    madeAChange = true;
                                 }
                             }
                         }
@@ -206,7 +222,7 @@ public class WaveformcCollapse : MonoBehaviour
             if (!madeAChange || fdsaf > 100) break;
         }
 
-        foreach(var square in squares)
+        foreach (var square in squares)
         {
             Destroy(square);
         }
