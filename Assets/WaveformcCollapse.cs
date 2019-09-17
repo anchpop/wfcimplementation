@@ -3,6 +3,18 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
+struct Point
+{
+    public int x;
+    public int y;
+
+    public Point(int xp, int yp)
+    {
+        x = xp;
+        y = yp;
+    }
+}
+
 public class WaveformcCollapse : MonoBehaviour
 {
     public int n = 2;
@@ -28,6 +40,9 @@ public class WaveformcCollapse : MonoBehaviour
     int offsety = 0;
     int steps = 0;
     bool contradictive = false;
+
+    HashSet<Vector2> interestingPoints;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -114,13 +129,11 @@ public class WaveformcCollapse : MonoBehaviour
     {
         if (contradictive) return;
         steps++;
-        void detectContradictions(List<List<Dictionary<List<List<int>>, bool>>> wave, out bool d, out int mx, out int my)
+        void detectContradictions(List<List<Dictionary<List<List<int>>, bool>>> wave, out bool d, out Point maxNeg)
         {
             // Find the position with the most negentropy
             d = true;
-            var ps = new List<Vector2>();
-            mx = 0;
-            my = 0;
+            var ps = new List<Point>();
             var maxscore = 0;
             var choiceIsValid = false;
             foreach (int y in Enumerable.Range(0, wave.Count))
@@ -150,41 +163,36 @@ public class WaveformcCollapse : MonoBehaviour
                         if (!choiceIsValid || numberOfFalses > maxscore)
                         {
                             d = false;
-                            ps = new List<Vector2>();
-                            ps.Add(new Vector2(x, y));
+                            ps = new List<Point>();
+                            ps.Add(new Point(x, y));
                             maxscore = numberOfFalses;
                             choiceIsValid = true;
                         }
                         else if (numberOfFalses == maxscore)
                         {
-                            ps.Add(new Vector2(x, y));
+                            ps.Add(new Point(x, y));
                         }
                     }
                 }
             }
+            maxNeg = new Point(0, 0);
             if (choiceIsValid)
             {
-                var v = ps[Random.Range(0, ps.Count)];
-                mx = (int)v.x;
-                my = (int)v.y;
+                maxNeg = ps[Random.Range(0, ps.Count)];
             }
+
         }
-        int maxx;
-        int maxy;
+        Point toCollapse;
         bool done;
-        detectContradictions(wave, out done, out maxx, out maxy);
+        detectContradictions(wave, out done, out toCollapse);
         offsetx = offsety = (int)Mathf.Floor(n / 2);
 
         if (!done)
         {
             // collapse the superposition
 
-            Debug.Log("collapsing wavefunction at " + maxx.ToString() + ", " + maxy.ToString());
-            if (maxx == 8 && maxy == 1)
-            {
-                Debug.Log("!!!");
-            }
-            var onesToMaybeKeep = from entry in wave[maxy][maxx]
+            Debug.Log("collapsing wavefunction at " + toCollapse.x.ToString() + ", " + toCollapse.y.ToString());
+            var onesToMaybeKeep = from entry in wave[toCollapse.y][toCollapse.x]
                                   where entry.Value
                                   select entry.Key;
             var values = from key in onesToMaybeKeep
@@ -204,24 +212,24 @@ public class WaveformcCollapse : MonoBehaviour
             }
 
 
-            foreach (var possibility in wave[maxy][maxx].Keys.ToArray())
+            foreach (var possibility in wave[toCollapse.y][toCollapse.x].Keys.ToArray())
             {
                 if (possibility == patternToKeep)
                 {
-                    wave[maxy][maxx][possibility] = true;
+                    wave[toCollapse.y][toCollapse.x][possibility] = true;
                 }
                 else
                 {
-                    wave[maxy][maxx][possibility] = false;
+                    wave[toCollapse.y][toCollapse.x][possibility] = false;
                 }
-                detectContradictions(wave, out _, out _, out _);
+                detectContradictions(wave, out _, out _);
             }
 
             // propagate updates
             var gas = 50;
             while (true)
             {
-                detectContradictions(wave, out _, out _, out _);
+                detectContradictions(wave, out _, out _);
                 gas -= 1;
                 bool madeAChange = false;
                 foreach (int y in Enumerable.Range(0, wave.Count))
@@ -274,9 +282,9 @@ public class WaveformcCollapse : MonoBehaviour
                             if (!possibilityValid)
                             {
                                 deletions += 1;
-                                detectContradictions(wave, out _, out _, out _);
+                                detectContradictions(wave, out _, out _);
                                 wave[y][x][possibility] = false;
-                                detectContradictions(wave, out _, out _, out _);
+                                detectContradictions(wave, out _, out _);
                                 madeAChange = true;
                                 if (contradictive) return;
                             }
@@ -390,6 +398,13 @@ public class WaveformcCollapse : MonoBehaviour
     List<List<int>> rotate270(List<List<int>> input)
     {
         return rotate90(rotate90(rotate90(input)));
+    }
+
+    HashSet<Point> generatePointsInSquare(Point p)
+    {
+        return new HashSet<Point>((from x in Enumerable.Range(-n, n)
+               from y in Enumerable.Range(-n, n)
+               select new Point(x + p.x, y + p.y)).ToList());
     }
 
 }
