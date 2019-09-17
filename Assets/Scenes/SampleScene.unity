@@ -132,7 +132,7 @@ GameObject:
   - component: {fileID: 688835149}
   - component: {fileID: 688835148}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: GameController
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -150,8 +150,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4fa924605b90ec84eaa7302e1e29b576, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  outputSizeX: 20
-  outputSizeY: 20
+  n: 2
+  maxVal: 1
+  outputSizeX: 10
+  outputSizeY: 10
+  blackSquare: {fileID: 8341235243840551491, guid: d8d0cd876500bc943b8d5755693ee840,
+    type: 3}
+  whiteSquare: {fileID: 6118507940941268542, guid: 445df161a76753e47a9b592804419597,
+    type: 3}
+  autorun: 1
 --- !u!4 &688835149
 Transform:
   m_ObjectHideFlags: 0
@@ -335,7 +342,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalPosition: {x: 0, y: 1, z: -25.02}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
