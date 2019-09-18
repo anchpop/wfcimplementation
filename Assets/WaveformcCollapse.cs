@@ -15,6 +15,44 @@ struct Point
     }
 }
 
+public class MyEqualityComparer : IEqualityComparer<int[,]>
+{
+    public bool Equals(int[,] x, int[,] y)
+    {
+        if (x.Length != y.Length || x.GetLength(0) != y.GetLength(0) || x.GetLength(1) != y.GetLength(1))
+        {
+            return false;
+        }
+        for (int i = 0; i < x.GetLength(0); i++)
+        {
+            for (int j = 0; j < x.GetLength(1); j++)
+            {
+                if (x[i, j] != y[i, j])
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public int GetHashCode(int[,] obj)
+    {
+        int result = 17;
+        for (int i = 0; i < obj.GetLength(0); i++)
+        {
+            for (int j = 0; i < obj.GetLength(1); i++)
+            {
+                unchecked
+                {
+                    result = result * 23 + obj[i, j];
+                }
+            }
+        }
+        return result;
+    }
+}
+
 public class WaveformcCollapse : MonoBehaviour
 {
     public int n = 2;
@@ -35,8 +73,8 @@ public class WaveformcCollapse : MonoBehaviour
         new List<int> { 0, 0, 0, 0, 0, },
     };
 
-    private Dictionary<List<List<int>>, int> patterns;
-    private List<List<Dictionary<List<List<int>>,bool>>> wave;
+    private Dictionary<int[,], int> patterns;
+    private Dictionary<int[,], bool>[,] wave;
     private Dictionary<Point, GameObject> squaresDrawn;
 
     public GameObject blackSquare;
@@ -55,21 +93,23 @@ public class WaveformcCollapse : MonoBehaviour
         squaresDrawn = new Dictionary<Point, GameObject>();
         transpose(input);
         Random.InitState(41);
-        patterns = new Dictionary<List<List<int>>, int>();
-        wave = new List<List<Dictionary<List<List<int>>, bool>>>();
-        foreach (var permutation in new List<List<List<int>>> { input, rotate90(input), rotate180(input), rotate270(input), flip(input), flip(rotate90(input)) })
+        patterns = new Dictionary<int[,], int>(new Dictionary<int[,], int>(), new MyEqualityComparer());
+
+        wave = new Dictionary<int[,], bool>[outputSizeX, outputSizeY];
+        foreach (var permutationp in new List<List<List<int>>> { input, rotate90(input), rotate180(input), rotate270(input), flip(input), flip(rotate90(input)) })
         {
-            foreach (int x in Enumerable.Range(0, permutation.Count - n + 1))
+            var permutation = Make2DArray(permutationp);
+
+            foreach (int x in Enumerable.Range(0, permutation.GetLength(0) - n + 1))
             {
-                foreach (int y in Enumerable.Range(0, permutation[0].Count - n + 1))
+                foreach (int y in Enumerable.Range(0, permutation.GetLength(1) - n + 1))
                 {
-                    var l = new List<List<int>>();
+                    var l = new int[n, n];
                     foreach (int xi in Enumerable.Range(0, n))
                     {
-                        l.Add(new List<int>());
                         foreach (int yi in Enumerable.Range(0, n))
                         {
-                            l[xi].Add(permutation[x + xi][y + yi]);
+                            l[xi, yi] = permutation[x + xi, y + yi];
                         }
                     }
                     if (patterns.ContainsKey(l))
@@ -84,16 +124,14 @@ public class WaveformcCollapse : MonoBehaviour
             }
         }
 
-
         foreach (int x in Enumerable.Range(0, outputSizeX))
         {
-            wave.Add(new List<Dictionary<List<List<int>>, bool>> { });
             foreach (int y in Enumerable.Range(0, outputSizeY))
             {
-                wave[x].Add(new Dictionary<List<List<int>>, bool> { });
+                wave[x, y] = new Dictionary<int[,], bool>(new Dictionary<int[,], bool>(), new MyEqualityComparer());
                 foreach (var pattern in patterns)
                 {
-                    wave[x][y][pattern.Key] = true;
+                    wave[x,y][pattern.Key] = true;
                 }
             }
         }
@@ -144,20 +182,20 @@ public class WaveformcCollapse : MonoBehaviour
 
         interestingPoints = new HashSet<Point>();
 
-        void detectContradictions(List<List<Dictionary<List<List<int>>, bool>>> wave, out bool d, out Point maxNeg)
+        void detectContradictions(Dictionary<int[,], bool>[,] wave, out bool d, out Point maxNeg)
         {
             // Find the position with the most negentropy
             d = true;
             var ps = new List<Point>();
             var maxscore = 0;
             var choiceIsValid = false;
-            foreach (int y in Enumerable.Range(0, wave.Count))
+            foreach (int x in Enumerable.Range(0, wave.GetLength(0)))
             {
-                foreach (int x in Enumerable.Range(0, wave[0].Count))
+                foreach (int y in Enumerable.Range(0, wave.GetLength(1)))
                 {
                     var numberOfFalses = 0;
                     var numberOfTrues = 0;
-                    foreach (var possibility in wave[y][x])
+                    foreach (var possibility in wave[x,y])
                     {
                         if (possibility.Value == false)
                         {
@@ -206,13 +244,13 @@ public class WaveformcCollapse : MonoBehaviour
         {
             // collapse the superposition
             Debug.Log("collapsing wavefunction at " + toCollapse.x.ToString() + ", " + toCollapse.y.ToString());
-            var onesToMaybeKeep = (from entry in wave[toCollapse.y][toCollapse.x]
-                                  where entry.Value
-                                  select entry.Key).ToList();
+            var onesToMaybeKeep = (from entry in wave[toCollapse.x, toCollapse.y]
+                                   where entry.Value
+                                   select entry.Key).ToList();
             var total = (from key in onesToMaybeKeep
-                        select patterns[key]).Sum();
+                         select patterns[key]).Sum();
 
-            var oneToKeep = Random.Range(0, total-1);
+            var oneToKeep = Random.Range(0, total - 1);
             int i = 0;
             var patternToKeep = onesToMaybeKeep.ToList()[0];
             foreach (var maybe in onesToMaybeKeep)
@@ -225,9 +263,9 @@ public class WaveformcCollapse : MonoBehaviour
             }
 
 
-            foreach (var possibility in wave[toCollapse.y][toCollapse.x].Keys.ToArray())
+            foreach (var possibility in wave[toCollapse.x, toCollapse.y].Keys.ToArray())
             {
-                wave[toCollapse.y][toCollapse.x][possibility] = possibility == patternToKeep;
+                wave[toCollapse.x, toCollapse.y][possibility] = possibility == patternToKeep;
                 detectContradictions(wave, out _, out _);
             }
             interestingPoints.UnionWith(generatePointsInSquare(toCollapse));
@@ -240,13 +278,13 @@ public class WaveformcCollapse : MonoBehaviour
                 foreach (Point p in interestingPoints.ToList())
                 {
                     interestingPoints.Remove(p);
-                    if (p.x < 0 || p.y < 0 || p.y >= wave.Count() || p.x >= wave[0].Count())
+                    if (p.x < 0 || p.y < 0 || p.x >= wave.GetLength(0) || p.y >= wave.GetLength(1))
                     {
                         continue;
                     }
-                    
 
-                    var truePossibilities = from entry in wave[p.y][p.x]
+
+                    var truePossibilities = from entry in wave[p.x, p.y]
                                             where entry.Value
                                             select entry.Key;
                     int c = truePossibilities.Count();
@@ -263,17 +301,17 @@ public class WaveformcCollapse : MonoBehaviour
                             {
                                 var posx = p.x + xr;
                                 var posy = p.y + yr;
-                                var color = possibility[yr][xr];
+                                var color = possibility[xr, yr];
                                 foreach (int xi in Enumerable.Range(0, n))
                                 {
                                     foreach (int yi in Enumerable.Range(0, n))
                                     {
-                                        if ((posx - xi) >= 0 && (posy - yi) >= 0 && (posx - xi) < wave[0].Count && (posy - yi) < wave.Count)
+                                        if ((posx - xi) >= 0 && (posy - yi) >= 0 && (posx - xi) < wave.GetLength(0) && (posy - yi) < wave.GetLength(1))
                                         {
                                             bool foundOne = false;
-                                            foreach (var possibility2 in wave[posy - yi][posx - xi])
+                                            foreach (var possibility2 in wave[posx - xi, posy - yi])
                                             {
-                                                if (possibility2.Value && possibility2.Key[yi][xi] == color)
+                                                if (possibility2.Value && possibility2.Key[xi, yi] == color)
                                                 {
                                                     foundOne = true;
                                                     break;
@@ -290,10 +328,10 @@ public class WaveformcCollapse : MonoBehaviour
                         }
                         if (!possibilityValid)
                         {
-                            wave[p.y][p.x][possibility] = false;
+                            wave[p.x, p.y][possibility] = false;
                             interestingPoints.UnionWith(generatePointsInSquare(p));
 
-                            if ((from w in wave[p.y][p.x]
+                            if ((from w in wave[p.x, p.y]
                                  where w.Value
                                  select w.Value).Count() == 0)
                             {
@@ -307,8 +345,8 @@ public class WaveformcCollapse : MonoBehaviour
                 }
             }
 
-            var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave[0].Count())
-                                                  from y in Enumerable.Range(0, wave.Count())
+            var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave.GetLength(0))
+                                                  from y in Enumerable.Range(0, wave.GetLength(1))
                                                   select new Point(x, y));
             /*foreach (var p in pointsToDraw)
             {
@@ -325,17 +363,17 @@ public class WaveformcCollapse : MonoBehaviour
 
             foreach (var p in pointsToDraw)
             {
-                var possibilities = (from entry in wave[p.y][p.x]
+                var possibilities = (from entry in wave[p.x, p.y]
                                      where entry.Value
-                                     select new LABColor(colors[entry.Key[offsety][offsetx]])).ToList();
+                                     select new LABColor(colors[entry.Key[offsetx, offsety]])).ToList();
                 if (possibilities.Count() > 0)
                 {
                     var l = (from c in possibilities
-                              select c.l).Sum() / possibilities.Count();
+                             select c.l).Sum() / possibilities.Count();
                     var a = (from c in possibilities
-                              select c.a).Sum() / possibilities.Count();
+                             select c.a).Sum() / possibilities.Count();
                     var b = (from c in possibilities
-                              select c.b).Sum() / possibilities.Count();
+                             select c.b).Sum() / possibilities.Count();
                     var color = (new LABColor(l, a, b)).ToColor();
                     if (possibilities.Count() > 1)
                     {
@@ -345,7 +383,7 @@ public class WaveformcCollapse : MonoBehaviour
                     {
                         color.a = 1f;
                     }
-                    
+
                     squaresDrawn[p].GetComponent<SpriteRenderer>().color = color;
                     squaresDrawn[p].transform.position = new Vector3(p.x + transform.position.x, -p.y + transform.position.y, 0);
                 }
@@ -397,11 +435,26 @@ public class WaveformcCollapse : MonoBehaviour
 
     IEnumerable<Point> generatePointsInSquare(Point p)
     {
-        var a = from x in Enumerable.Range(-n+1, n*2)
-               from y in Enumerable.Range(-n+1, n*2)
-               select new Point(x + p.x, y + p.y);
+        var a = from x in Enumerable.Range(-n + 1, n * 2)
+                from y in Enumerable.Range(-n + 1, n * 2)
+                select new Point(x + p.x, y + p.y);
         var b = a.ToList();
         return a;
+    }
+
+    int[,] Make2DArray(List<List<int>> i)
+    {
+        int height = i.Count();
+        int width = i[0].Count();
+        var o = new int[width, height];
+        foreach (var x in Enumerable.Range(0, width))
+        {
+            foreach (var y in Enumerable.Range(0, height))
+            {
+                o[x, y] = i[y][x];
+            }
+        }
+        return o;
     }
 
 }
