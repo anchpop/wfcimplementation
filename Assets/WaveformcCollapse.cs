@@ -21,34 +21,40 @@ public class WaveformcCollapse : MonoBehaviour
     public int maxVal = 1;
     public int outputSizeX = 20;
     public int outputSizeY = 20;
-    
+
+    public List<Color> colors = new List<Color> {
+        Color.black,
+        Color.white
+    };
+
     public List<List<int>> input = new List<List<int>>  {
-        new List<int> { 0, 0, 0, 0, },
-        new List<int> { 0, 1, 1, 1, },
-        new List<int> { 0, 1, 0, 1, },
-        new List<int> { 0, 1, 1, 1, },
+        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 1, 0, 1, },
+        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 0, 0, 0, },
     };
 
     private Dictionary<List<List<int>>, int> patterns;
     private List<List<Dictionary<List<List<int>>,bool>>> wave;
+    private Dictionary<Point, GameObject> squaresDrawn;
 
     public GameObject blackSquare;
     public GameObject whiteSquare;
-    List<GameObject> squares;
     public bool autorun = false;
     int offsetx = 0;
     int offsety = 0;
     int steps = 0;
     bool contradictive = false;
 
-    HashSet<Vector2> interestingPoints;
+    HashSet<Point> interestingPoints;
 
     // Start is called before the first frame update
     void Start()
     {
+        squaresDrawn = new Dictionary<Point, GameObject>();
         transpose(input);
-        Random.seed = 42;
-        squares = new List<GameObject>();
+        Random.InitState(41);
         patterns = new Dictionary<List<List<int>>, int>();
         wave = new List<List<Dictionary<List<List<int>>, bool>>>();
         foreach (var permutation in new List<List<List<int>>> { input, rotate90(input), rotate180(input), rotate270(input), flip(input), flip(rotate90(input)) })
@@ -92,26 +98,32 @@ public class WaveformcCollapse : MonoBehaviour
             }
         }
 
-        foreach (int renderx in Enumerable.Range(0, input.Count))
+        foreach (int rendery in Enumerable.Range(0, input.Count))
         {
-            foreach (int rendery in Enumerable.Range(0, input[0].Count))
+            foreach (int renderx in Enumerable.Range(0, input[0].Count))
             {
-                GameObject sq = null;
-                if (input[renderx][rendery] == 0)
-                {
-                    sq = Instantiate(blackSquare);
-                }
-                else if (input[renderx][rendery] == 1)
-                {
-                    sq = Instantiate(whiteSquare);
-                }
-                if (sq != null)
-                {
-                    sq.transform.position = new Vector3(renderx - outputSizeX / 2 - input.Count - 1, -rendery + outputSizeX / 2 + input[0].Count, 0);
-                }
+
+                GameObject sq = Instantiate(whiteSquare);
+                sq.GetComponent<SpriteRenderer>().color = colors[input[rendery][renderx]];
+                sq.transform.position = new Vector3(renderx - outputSizeX / 2 - input.Count - 1, -rendery + outputSizeX / 2 + input[0].Count, 0);
             }
         }
 
+
+
+        foreach (var square in squaresDrawn.Values)
+        {
+            Destroy(square);
+        }
+        foreach (var x in Enumerable.Range(0, outputSizeX))
+        {
+
+            foreach (var y in Enumerable.Range(0, outputSizeX))
+            {
+                squaresDrawn[new Point(x, y)] = Instantiate(whiteSquare);
+                squaresDrawn[new Point(x, y)].transform.position = new Vector3(x, y);
+            }
+        }
 
         return;
     }
@@ -129,6 +141,9 @@ public class WaveformcCollapse : MonoBehaviour
     {
         if (contradictive) return;
         steps++;
+
+        interestingPoints = new HashSet<Point>();
+
         void detectContradictions(List<List<Dictionary<List<List<int>>, bool>>> wave, out bool d, out Point maxNeg)
         {
             // Find the position with the most negentropy
@@ -156,7 +171,7 @@ public class WaveformcCollapse : MonoBehaviour
                     if (numberOfTrues == 0)
                     {
                         contradictive = true;
-                        Debug.Log("We have encountered a contradiction at " + x.ToString() +", " + y.ToString() + "!");
+                        Debug.Log("We have encountered a contradiction at " + x.ToString() + ", " + y.ToString() + "!");
                     }
                     if (numberOfTrues > 1)
                     {
@@ -190,14 +205,12 @@ public class WaveformcCollapse : MonoBehaviour
         if (!done)
         {
             // collapse the superposition
-
             Debug.Log("collapsing wavefunction at " + toCollapse.x.ToString() + ", " + toCollapse.y.ToString());
-            var onesToMaybeKeep = from entry in wave[toCollapse.y][toCollapse.x]
+            var onesToMaybeKeep = (from entry in wave[toCollapse.y][toCollapse.x]
                                   where entry.Value
-                                  select entry.Key;
-            var values = from key in onesToMaybeKeep
-                        select patterns[key];
-            var total = values.Sum();
+                                  select entry.Key).ToList();
+            var total = (from key in onesToMaybeKeep
+                        select patterns[key]).Sum();
 
             var oneToKeep = Random.Range(0, total-1);
             int i = 0;
@@ -205,7 +218,7 @@ public class WaveformcCollapse : MonoBehaviour
             foreach (var maybe in onesToMaybeKeep)
             {
                 i += patterns[maybe];
-                if (i > oneToKeep)
+                if (i >= oneToKeep)
                 {
                     patternToKeep = maybe;
                 }
@@ -214,147 +227,129 @@ public class WaveformcCollapse : MonoBehaviour
 
             foreach (var possibility in wave[toCollapse.y][toCollapse.x].Keys.ToArray())
             {
-                if (possibility == patternToKeep)
-                {
-                    wave[toCollapse.y][toCollapse.x][possibility] = true;
-                }
-                else
-                {
-                    wave[toCollapse.y][toCollapse.x][possibility] = false;
-                }
+                wave[toCollapse.y][toCollapse.x][possibility] = possibility == patternToKeep;
                 detectContradictions(wave, out _, out _);
             }
+            interestingPoints.UnionWith(generatePointsInSquare(toCollapse));
+
 
             // propagate updates
-            var gas = 50;
-            while (true)
+            while (interestingPoints.Count() != 0)
             {
                 detectContradictions(wave, out _, out _);
-                gas -= 1;
-                bool madeAChange = false;
-                foreach (int y in Enumerable.Range(0, wave.Count))
+                foreach (Point p in interestingPoints.ToList())
                 {
-                    foreach (int x in Enumerable.Range(0, wave[0].Count))
+                    interestingPoints.Remove(p);
+                    if (p.x < 0 || p.y < 0 || p.y >= wave.Count() || p.x >= wave[0].Count())
                     {
-                        int deletions = 0;
-                        var truePossibilities = from entry in wave[y][x]
-                                                where entry.Value
-                                                select entry.Key;
-                        int c = truePossibilities.Count();
-                        if (c < 2)
+                        continue;
+                    }
+                    
+
+                    var truePossibilities = from entry in wave[p.y][p.x]
+                                            where entry.Value
+                                            select entry.Key;
+                    int c = truePossibilities.Count();
+                    if (c < 2)
+                    {
+                        continue;
+                    }
+                    foreach (var possibility in truePossibilities.ToArray())
+                    {
+                        bool possibilityValid = true;
+                        foreach (int yr in Enumerable.Range(0, n))
                         {
-                            continue;
-                        }
-                        foreach (var possibility in truePossibilities.ToArray())
-                        {
-                            bool possibilityValid = true;
-                            foreach (int yr in Enumerable.Range(0, n))
+                            foreach (int xr in Enumerable.Range(0, n))
                             {
-                                foreach (int xr in Enumerable.Range(0, n))
+                                var posx = p.x + xr;
+                                var posy = p.y + yr;
+                                var color = possibility[yr][xr];
+                                foreach (int xi in Enumerable.Range(0, n))
                                 {
-                                    var posx = x + xr;
-                                    var posy = y + yr;
-                                    var color = possibility[yr][xr];
-                                    foreach (int xi in Enumerable.Range(0, n))
+                                    foreach (int yi in Enumerable.Range(0, n))
                                     {
-                                        foreach (int yi in Enumerable.Range(0, n))
+                                        if ((posx - xi) >= 0 && (posy - yi) >= 0 && (posx - xi) < wave[0].Count && (posy - yi) < wave.Count)
                                         {
-                                            if ((posx - xi) >= 0 && (posy - yi) >= 0 && (posx - xi) < wave[0].Count && (posy - yi) < wave.Count)
+                                            bool foundOne = false;
+                                            foreach (var possibility2 in wave[posy - yi][posx - xi])
                                             {
-                                                bool foundOne = false;
-                                                foreach (var possibility2 in wave[posy - yi][posx - xi])
+                                                if (possibility2.Value && possibility2.Key[yi][xi] == color)
                                                 {
-                                                    if (possibility2.Value && possibility2.Key[yi][xi] == color)
-                                                    {
-                                                        foundOne = true;
-                                                        break;
-                                                    }
+                                                    foundOne = true;
+                                                    break;
                                                 }
-                                                if (!foundOne)
-                                                {
-                                                    possibilityValid = false;
-                                                }
+                                            }
+                                            if (!foundOne)
+                                            {
+                                                possibilityValid = false;
                                             }
                                         }
                                     }
                                 }
                             }
-                            if (!possibilityValid)
+                        }
+                        if (!possibilityValid)
+                        {
+                            wave[p.y][p.x][possibility] = false;
+                            interestingPoints.UnionWith(generatePointsInSquare(p));
+
+                            if ((from w in wave[p.y][p.x]
+                                 where w.Value
+                                 select w.Value).Count() == 0)
                             {
-                                deletions += 1;
-                                detectContradictions(wave, out _, out _);
-                                wave[y][x][possibility] = false;
-                                detectContradictions(wave, out _, out _);
-                                madeAChange = true;
-                                if (contradictive) return;
+                                Debug.Log("Found a contradiction at " + p.x.ToString() + ", " + p.y.ToString() + ".");
+                                contradictive = true;
+                                squaresDrawn[p].GetComponent<SpriteRenderer>().color = Color.red;
+                                return;
                             }
                         }
                     }
                 }
-                if (!madeAChange || gas < 1) break;
-
             }
 
-            foreach (var square in squares)
+            var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave[0].Count())
+                                                  from y in Enumerable.Range(0, wave.Count())
+                                                  select new Point(x, y));
+            /*foreach (var p in pointsToDraw)
             {
-                Destroy(square);
-            }
-
-            string s = "";
-            int renderx = 0;
-            foreach (var row in wave)
-            {
-                renderx++;
-                int rendery = 0;
-                foreach (var element in row)
+                if (squaresDrawn.ContainsKey(p))
                 {
-                    rendery++;
-                    int singlePossibility = -1;
-                    var posibilities = new List<int>();
-                    int faffsdf = 0;
-                    foreach (var possibility in element)
+                    if ((from w in wave[p.y][p.x]
+                         where w.Value
+                         select w.Value).Count() <= 1)
                     {
-                        if (possibility.Value == true)
-                        {
-                            if (singlePossibility == -1)
-                            {
-                                singlePossibility = possibility.Key[offsety][offsetx];
-                            }
-                            else
-                            {
-                                posibilities.Add(faffsdf);
-                            }
-                        }
-                        faffsdf++;
+                        pointsToDraw.Remove(p);
                     }
-                    if (posibilities.Count > 1)
+                }
+            }*/
+
+            foreach (var p in pointsToDraw)
+            {
+                var possibilities = (from entry in wave[p.y][p.x]
+                                     where entry.Value
+                                     select new LABColor(colors[entry.Key[offsety][offsetx]])).ToList();
+                if (possibilities.Count() > 0)
+                {
+                    var l = (from c in possibilities
+                              select c.l).Sum() / possibilities.Count();
+                    var a = (from c in possibilities
+                              select c.a).Sum() / possibilities.Count();
+                    var b = (from c in possibilities
+                              select c.b).Sum() / possibilities.Count();
+                    var color = (new LABColor(l, a, b)).ToColor();
+                    if (possibilities.Count() > 1)
                     {
-                        s = s + "s ";
+                        color.a = Mathf.Lerp(.7f, .1f, possibilities.Count() / 5);
                     }
                     else
                     {
-                        GameObject sq = null;
-                        if (singlePossibility == 0)
-                        {
-                            sq = Instantiate(blackSquare);
-                        }
-                        else if (singlePossibility == 1)
-                        {
-                            sq = Instantiate(whiteSquare);
-                        }
-                        if (sq != null)
-                        {
-                            sq.transform.position = new Vector3(renderx - outputSizeX / 2, -rendery + outputSizeX / 2, 0);
-                            squares.Add(sq);
-                        }
-                        s = s + singlePossibility.ToString() + " ";
+                        color.a = 1f;
                     }
+                    
+                    squaresDrawn[p].GetComponent<SpriteRenderer>().color = color;
+                    squaresDrawn[p].transform.position = new Vector3(p.x + transform.position.x, -p.y + transform.position.y, 0);
                 }
-                s = s + "\n";
             }
-        
-            Debug.Log(s.Replace("\n", System.Environment.NewLine));
-
         }
     }
 
@@ -400,11 +395,13 @@ public class WaveformcCollapse : MonoBehaviour
         return rotate90(rotate90(rotate90(input)));
     }
 
-    HashSet<Point> generatePointsInSquare(Point p)
+    IEnumerable<Point> generatePointsInSquare(Point p)
     {
-        return new HashSet<Point>((from x in Enumerable.Range(-n, n)
-               from y in Enumerable.Range(-n, n)
-               select new Point(x + p.x, y + p.y)).ToList());
+        var a = from x in Enumerable.Range(-n+1, n*2)
+               from y in Enumerable.Range(-n+1, n*2)
+               select new Point(x + p.x, y + p.y);
+        var b = a.ToList();
+        return a;
     }
 
 }
