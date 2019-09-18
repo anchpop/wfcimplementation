@@ -217,7 +217,10 @@ public class WaveformcCollapse : MonoBehaviour
 
     public void step()
     {
-        if (contradictive) return;
+        if (contradictive)
+        {
+            return;
+        }
         steps++;
 
         interestingPoints = new HashSet<Point>();
@@ -372,6 +375,8 @@ public class WaveformcCollapse : MonoBehaviour
                                 Debug.Log("Found a contradiction at " + p.x.ToString() + ", " + p.y.ToString() + ".");
                                 contradictive = true;
                                 squaresDrawn[p].GetComponent<SpriteRenderer>().color = Color.red;
+                                comeUpWithColors();
+                                return;
                             }
                         }
                     }
@@ -504,7 +509,7 @@ public class WaveformcCollapse : MonoBehaviour
     }
     public void addRow()
     {
-        if (input.Count() > 8)
+        if (input.Count() > 14)
         {
             return;
         }
@@ -527,7 +532,7 @@ public class WaveformcCollapse : MonoBehaviour
     }
     public void addColumn()
     {
-        if (input[0].Count() > 8)
+        if (input[0].Count() > 14)
         {
             return;
         }
