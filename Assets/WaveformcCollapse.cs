@@ -67,17 +67,18 @@ public class WaveformcCollapse : MonoBehaviour
 
     public List<List<int>> input = new List<List<int>>  {
         new List<int> { 0, 0, 0, 0, 0, },
-        new List<int> { 0, 1, 1, 1, 0, },
-        new List<int> { 0, 1, 0, 1, 1, },
-        new List<int> { 0, 1, 0, 0, 1, },
-        new List<int> { 0, 1, 1, 1, 1, },
+        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 0, 0, 0, },
     };
 
     private Dictionary<int[,], int> patterns;
     private Dictionary<int[,], bool>[,] wave;
+    private Dictionary<Point, Color> colorsToAssign;
     private Dictionary<Point, GameObject> squaresDrawn;
-
-    public GameObject blackSquare;
+    private List<GameObject> inputSquares = null;
+    
     public GameObject whiteSquare;
     public bool autorun = false;
     int offsetx = 0;
@@ -85,12 +86,15 @@ public class WaveformcCollapse : MonoBehaviour
     int steps = 0;
     bool contradictive;
 
+    public int stepsPerFrame = 6;
+
     HashSet<Point> interestingPoints;
 
     // Start is called before the first frame update
     void Start()
     {
         initialize();
+        comeUpWithColors();
     }
 
     // Update is called once per frame
@@ -98,16 +102,29 @@ public class WaveformcCollapse : MonoBehaviour
     {
         if (autorun)
         {
-            step();
+            foreach (var i in Enumerable.Range(0, stepsPerFrame))
+            {
+                step();
+            }
         }
+        assignColors();
     }
 
     public void initialize()
     {
+        if (inputSquares != null)
+        {
+            foreach (var sq in inputSquares)
+            {
+                Destroy(sq);
+            }
+        }
+        inputSquares = new List<GameObject>();
         maxVal = (from row in input
-                 select row.Max()).Max();
+                  select row.Max()).Max();
 
         contradictive = false;
+        colorsToAssign = new Dictionary<Point, Color>();
         squaresDrawn = new Dictionary<Point, GameObject>();
         transpose(input);
         Random.InitState(41);
@@ -161,11 +178,17 @@ public class WaveformcCollapse : MonoBehaviour
                 GameObject sq = Instantiate(whiteSquare);
                 sq.GetComponent<SpriteRenderer>().color = colors[input[rendery][renderx]];
                 sq.transform.position = new Vector3(renderx - input[0].Count() - 1 + transform.position.x, -rendery + transform.position.y, 0);
+                inputSquares.Add(sq);
+                var callbackO = sq.AddComponent<OnClickCallback>();
+                callbackO.callback = () =>
+                {
+                    input[rendery][renderx] = (input[rendery][renderx] + 1) % colors.Count();
+                    initialize();
+                };
             }
         }
 
-
-
+        comeUpWithColors();
         foreach (var square in squaresDrawn.Values)
         {
             Destroy(square);
@@ -175,9 +198,12 @@ public class WaveformcCollapse : MonoBehaviour
             foreach (var y in Enumerable.Range(0, outputSizeX))
             {
                 squaresDrawn[new Point(x, y)] = Instantiate(whiteSquare);
-                squaresDrawn[new Point(x, y)].transform.position = new Vector3(x, y);
+                squaresDrawn[new Point(x, y)].GetComponent<SpriteRenderer>().color = colorsToAssign[new Point(x, y)];
+                squaresDrawn[new Point(x, y)].transform.position = new Vector3(x + transform.position.x, -y + transform.position.y, 0);
             }
         }
+        assignColors();
+
 
         return;
     }
@@ -339,46 +365,66 @@ public class WaveformcCollapse : MonoBehaviour
                                 Debug.Log("Found a contradiction at " + p.x.ToString() + ", " + p.y.ToString() + ".");
                                 contradictive = true;
                                 squaresDrawn[p].GetComponent<SpriteRenderer>().color = Color.red;
-                                return;
                             }
                         }
                     }
                 }
             }
+        }
+        comeUpWithColors();
+    }
 
-            var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave.GetLength(0))
-                                                  from y in Enumerable.Range(0, wave.GetLength(1))
-                                                  select new Point(x, y));
-
-            foreach (var p in pointsToDraw)
+    void comeUpWithColors()
+    {
+        var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave.GetLength(0))
+                                              from y in Enumerable.Range(0, wave.GetLength(1))
+                                              select new Point(x, y));
+        foreach (var p in pointsToDraw)
+        {
+            var possibilities = (from entry in wave[p.x, p.y]
+                                 where entry.Value
+                                 select colors[entry.Key[offsetx, offsety]]).ToList();
+            if (possibilities.Count() != 0)
             {
-                var possibilities = (from entry in wave[p.x, p.y]
-                                     where entry.Value
-                                     select new LABColor(colors[entry.Key[offsetx, offsety]])).ToList();
-                if (possibilities.Count() > 0)
-                {
-                    var l = (from c in possibilities
-                             select c.l).Sum() / possibilities.Count();
-                    var a = (from c in possibilities
-                             select c.a).Sum() / possibilities.Count();
-                    var b = (from c in possibilities
-                             select c.b).Sum() / possibilities.Count();
-                    var color = (new LABColor(l, a, b)).ToColor();
-                    if (possibilities.Count() > 1)
-                    {
-                        color.a = Mathf.Lerp(.7f, .1f, possibilities.Count() / 5);
-                    }
-                    else
-                    {
-                        color.a = 1f;
-                    }
 
-                    squaresDrawn[p].GetComponent<SpriteRenderer>().color = color;
-                    squaresDrawn[p].transform.position = new Vector3(p.x + transform.position.x, -p.y + transform.position.y, 0);
+                var r = (from c in possibilities
+                         select c.r).Sum() / possibilities.Count();
+                var g = (from c in possibilities
+                         select c.g).Sum() / possibilities.Count();
+                var b = (from c in possibilities
+                         select c.b).Sum() / possibilities.Count();
+                var color = (new Color(r, g, b));
+                if (possibilities.Count() > 1)
+                {
+                    color.a = Mathf.Lerp(.7f, .1f, possibilities.Count() / 5);
                 }
+                else
+                {
+                    color.a = 1f;
+                }
+                color.a = 1f;
+                colorsToAssign[p] = color;
+            }
+            else
+            {
+                colorsToAssign[p] = Color.red;
             }
         }
     }
+
+    void assignColors()
+    {
+        var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave.GetLength(0))
+                                              from y in Enumerable.Range(0, wave.GetLength(1))
+                                              select new Point(x, y));
+        foreach (var p in pointsToDraw)
+        {
+            var color = squaresDrawn[p].GetComponent<SpriteRenderer>().color;
+            squaresDrawn[p].GetComponent<SpriteRenderer>().color = Color.Lerp(color, colorsToAssign[p], 15 * Time.deltaTime);
+        }
+
+    }
+
 
     List<List<int>> transpose(List<List<int>> input)
     {
@@ -444,6 +490,58 @@ public class WaveformcCollapse : MonoBehaviour
             }
         }
         return o;
+    }
+
+    public void toggleAutorun()
+    {
+        autorun = !autorun;
+    }
+    public void addRow()
+    {
+        if (input.Count() > 8)
+        {
+            return;
+        }
+        input.Add(new List<int>());
+        foreach (var x in Enumerable.Range(0,input[0].Count()))
+        {
+            input[input.Count() - 1].Add(0);
+        }
+        initialize();
+    }
+
+    public void subtractRow()
+    {
+        if (input.Count() <= n)
+        {
+            return;
+        }
+        input.RemoveAt(input.Count() - 1);
+        initialize();
+    }
+    public void addColumn()
+    {
+        if (input[0].Count() > 8)
+        {
+            return;
+        }
+        foreach (var y in Enumerable.Range(0, input.Count()))
+        {
+            input[y].Add(0);
+        }
+        initialize();
+    }
+    public void subtractColumn()
+    {
+        if (input.Count() <= n)
+        {
+            return;
+        }
+        foreach (var y in Enumerable.Range(0, input.Count()))
+        {
+            input[y].RemoveAt(input.Count() - 1);
+        }
+        initialize();
     }
 
 }
