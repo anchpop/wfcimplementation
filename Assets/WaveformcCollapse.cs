@@ -120,12 +120,19 @@ public class WaveformcCollapse : MonoBehaviour
             }
         }
         inputSquares = new List<GameObject>();
+        if (squaresDrawn != null)
+        {
+            foreach (var sq in squaresDrawn.Values)
+            {
+                Destroy(sq);
+            }
+        }
+        squaresDrawn = new Dictionary<Point, GameObject>();
         maxVal = (from row in input
                   select row.Max()).Max();
 
         contradictive = false;
         colorsToAssign = new Dictionary<Point, Color>();
-        squaresDrawn = new Dictionary<Point, GameObject>();
         transpose(input);
         Random.InitState(41);
         patterns = new Dictionary<int[,], int>(new Dictionary<int[,], int>(), new MyEqualityComparer());
@@ -402,7 +409,6 @@ public class WaveformcCollapse : MonoBehaviour
                 {
                     color.a = 1f;
                 }
-                color.a = 1f;
                 colorsToAssign[p] = color;
             }
             else
@@ -420,7 +426,7 @@ public class WaveformcCollapse : MonoBehaviour
         foreach (var p in pointsToDraw)
         {
             var color = squaresDrawn[p].GetComponent<SpriteRenderer>().color;
-            squaresDrawn[p].GetComponent<SpriteRenderer>().color = Color.Lerp(color, colorsToAssign[p], 15 * Time.deltaTime);
+            squaresDrawn[p].GetComponent<SpriteRenderer>().color = Color.Lerp(color, colorsToAssign[p], 7 * Time.deltaTime);
         }
 
     }
