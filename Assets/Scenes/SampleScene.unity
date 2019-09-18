@@ -152,8 +152,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   n: 2
   maxVal: 1
-  outputSizeX: 20
-  outputSizeY: 20
+  outputSizeX: 15
+  outputSizeY: 15
   colors:
   - {r: 0, g: 0, b: 0, a: 1}
   - {r: 1, g: 1, b: 1, a: 1}

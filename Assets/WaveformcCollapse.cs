@@ -56,7 +56,7 @@ public class MyEqualityComparer : IEqualityComparer<int[,]>
 public class WaveformcCollapse : MonoBehaviour
 {
     public int n = 2;
-    public int maxVal = 1;
+    public int maxVal;
     public int outputSizeX = 20;
     public int outputSizeY = 20;
 
@@ -83,13 +83,31 @@ public class WaveformcCollapse : MonoBehaviour
     int offsetx = 0;
     int offsety = 0;
     int steps = 0;
-    bool contradictive = false;
+    bool contradictive;
 
     HashSet<Point> interestingPoints;
 
     // Start is called before the first frame update
     void Start()
     {
+        initialize();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (autorun)
+        {
+            step();
+        }
+    }
+
+    public void initialize()
+    {
+        maxVal = (from row in input
+                 select row.Max()).Max();
+
+        contradictive = false;
         squaresDrawn = new Dictionary<Point, GameObject>();
         transpose(input);
         Random.InitState(41);
@@ -131,7 +149,7 @@ public class WaveformcCollapse : MonoBehaviour
                 wave[x, y] = new Dictionary<int[,], bool>(new Dictionary<int[,], bool>(), new MyEqualityComparer());
                 foreach (var pattern in patterns)
                 {
-                    wave[x,y][pattern.Key] = true;
+                    wave[x, y][pattern.Key] = true;
                 }
             }
         }
@@ -164,15 +182,6 @@ public class WaveformcCollapse : MonoBehaviour
         return;
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        if (autorun)
-        {
-            step();
-        }
-    }
-
     public void step()
     {
         if (contradictive) return;
@@ -192,18 +201,14 @@ public class WaveformcCollapse : MonoBehaviour
                 foreach (int y in Enumerable.Range(0, wave.GetLength(1)))
                 {
                     var numberOfFalses = 0;
-                    var numberOfTrues = 0;
                     foreach (var possibility in wave[x,y])
                     {
                         if (possibility.Value == false)
                         {
                             numberOfFalses += 1;
                         }
-                        else
-                        {
-                            numberOfTrues += 1;
-                        }
                     }
+                    var numberOfTrues = wave[x, y].Count() - numberOfFalses;
                     if (numberOfTrues == 0)
                     {
                         contradictive = true;
@@ -281,7 +286,6 @@ public class WaveformcCollapse : MonoBehaviour
                     {
                         continue;
                     }
-
 
                     var truePossibilities = from entry in wave[p.x, p.y]
                                             where entry.Value
