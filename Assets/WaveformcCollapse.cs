@@ -66,11 +66,11 @@ public class WaveformcCollapse : MonoBehaviour
     };
 
     public List<List<int>> input = new List<List<int>>  {
-        new List<int> { 1, 0, 0, 0, 0, },
         new List<int> { 0, 0, 0, 0, 0, },
-        new List<int> { 0, 0, 1, 1, 1, },
-        new List<int> { 0, 0, 1, 0, 1, },
-        new List<int> { 0, 0, 1, 1, 1, },
+        new List<int> { 0, 1, 1, 1, 0, },
+        new List<int> { 0, 1, 0, 1, 1, },
+        new List<int> { 0, 1, 0, 0, 1, },
+        new List<int> { 0, 1, 1, 1, 1, },
     };
 
     private Dictionary<int[,], int> patterns;
@@ -212,7 +212,7 @@ public class WaveformcCollapse : MonoBehaviour
                     if (numberOfTrues == 0)
                     {
                         contradictive = true;
-                        Debug.Log("We have encountered a contradiction at " + x.ToString() + ", " + y.ToString() + "!");
+                        //Debug.Log("Encountered a contradiction at " + x.ToString() + ", " + y.ToString() + "!");
                     }
                     if (numberOfTrues > 1)
                     {
@@ -236,8 +236,9 @@ public class WaveformcCollapse : MonoBehaviour
             {
                 maxNeg = ps[Random.Range(0, ps.Count)];
             }
-
         }
+
+
         Point toCollapse;
         bool done;
         detectContradictions(wave, out done, out toCollapse);
@@ -246,7 +247,7 @@ public class WaveformcCollapse : MonoBehaviour
         if (!done)
         {
             // collapse a superposition
-            Debug.Log("collapsing wavefunction at " + toCollapse.x.ToString() + ", " + toCollapse.y.ToString());
+            //Debug.Log("collapsing wavefunction at " + toCollapse.x.ToString() + ", " + toCollapse.y.ToString());
             var onesToMaybeKeep = (from entry in wave[toCollapse.x, toCollapse.y]
                                    where entry.Value
                                    select entry.Key).ToList();
@@ -265,12 +266,10 @@ public class WaveformcCollapse : MonoBehaviour
                     break;
                 }
             }
-
-
+            
             foreach (var possibility in wave[toCollapse.x, toCollapse.y].Keys.ToArray())
             {
                 wave[toCollapse.x, toCollapse.y][possibility] = possibility == patternToKeep;
-                detectContradictions(wave, out _, out _);
             }
             interestingPoints.UnionWith(generatePointsInSquare(toCollapse));
 
@@ -278,7 +277,6 @@ public class WaveformcCollapse : MonoBehaviour
             // propagate updates
             while (interestingPoints.Count() != 0)
             {
-                detectContradictions(wave, out _, out _);
                 foreach (Point p in interestingPoints.ToList())
                 {
                     interestingPoints.Remove(p);
