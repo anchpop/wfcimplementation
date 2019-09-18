@@ -66,11 +66,11 @@ public class WaveformcCollapse : MonoBehaviour
     };
 
     public List<List<int>> input = new List<List<int>>  {
+        new List<int> { 1, 0, 0, 0, 0, },
         new List<int> { 0, 0, 0, 0, 0, },
-        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 1, 1, 1, },
         new List<int> { 0, 0, 1, 0, 1, },
-        new List<int> { 0, 0, 0, 0, 0, },
-        new List<int> { 0, 0, 0, 0, 0, },
+        new List<int> { 0, 0, 1, 1, 1, },
     };
 
     private Dictionary<int[,], int> patterns;
@@ -140,10 +140,9 @@ public class WaveformcCollapse : MonoBehaviour
         {
             foreach (int renderx in Enumerable.Range(0, input[0].Count))
             {
-
                 GameObject sq = Instantiate(whiteSquare);
                 sq.GetComponent<SpriteRenderer>().color = colors[input[rendery][renderx]];
-                sq.transform.position = new Vector3(renderx - outputSizeX / 2 - input.Count - 1, -rendery + outputSizeX / 2 + input[0].Count, 0);
+                sq.transform.position = new Vector3(renderx - input[0].Count() - 1 + transform.position.x, -rendery + transform.position.y, 0);
             }
         }
 
@@ -155,7 +154,6 @@ public class WaveformcCollapse : MonoBehaviour
         }
         foreach (var x in Enumerable.Range(0, outputSizeX))
         {
-
             foreach (var y in Enumerable.Range(0, outputSizeX))
             {
                 squaresDrawn[new Point(x, y)] = Instantiate(whiteSquare);
@@ -242,7 +240,7 @@ public class WaveformcCollapse : MonoBehaviour
 
         if (!done)
         {
-            // collapse the superposition
+            // collapse a superposition
             Debug.Log("collapsing wavefunction at " + toCollapse.x.ToString() + ", " + toCollapse.y.ToString());
             var onesToMaybeKeep = (from entry in wave[toCollapse.x, toCollapse.y]
                                    where entry.Value
@@ -259,6 +257,7 @@ public class WaveformcCollapse : MonoBehaviour
                 if (i >= oneToKeep)
                 {
                     patternToKeep = maybe;
+                    break;
                 }
             }
 
@@ -348,18 +347,6 @@ public class WaveformcCollapse : MonoBehaviour
             var pointsToDraw = new HashSet<Point>(from x in Enumerable.Range(0, wave.GetLength(0))
                                                   from y in Enumerable.Range(0, wave.GetLength(1))
                                                   select new Point(x, y));
-            /*foreach (var p in pointsToDraw)
-            {
-                if (squaresDrawn.ContainsKey(p))
-                {
-                    if ((from w in wave[p.y][p.x]
-                         where w.Value
-                         select w.Value).Count() <= 1)
-                    {
-                        pointsToDraw.Remove(p);
-                    }
-                }
-            }*/
 
             foreach (var p in pointsToDraw)
             {

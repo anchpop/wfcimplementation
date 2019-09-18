@@ -32,17 +32,18 @@ public struct LABColor
         b = temp.b;
     }
 
+    // static function for interpolation between two Unity Colors through normalized colorspace
+    public static Color Lerp(Color a, Color b, float t)
+    {
+        return (LABColor.Lerp(LABColor.FromColor(a), LABColor.FromColor(b), t)).ToColor();
+    }
+
     // static function for linear interpolation between two LABColors
     public static LABColor Lerp(LABColor a, LABColor b, float t)
     {
         return new LABColor(Mathf.Lerp(a.l, b.l, t), Mathf.Lerp(a.a, b.a, t), Mathf.Lerp(a.b, b.b, t));
     }
 
-    // static function for interpolation between two Unity Colors through normalized colorspace
-    public static Color Lerp(Color a, Color b, float t)
-    {
-        return (LABColor.Lerp(LABColor.FromColor(a), LABColor.FromColor(b), t)).ToColor();
-    }
 
     // static function for returning the color difference in a normalized colorspace (Delta-E)
     public static float Distance(LABColor a, LABColor b)
